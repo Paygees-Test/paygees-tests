@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { TEST_EMAIL, TEST_PASSWORD } from "./helpers";
+import { TEST_EMAIL, TEST_PASSWORD, TEST_EMAIL_FREE, TEST_PASSWORD_FREE, TEST_EMAIL_PREMIUM, TEST_PASSWORD_PREMIUM, loginAs } from "./helpers";
 
 test.describe("Auth: Login Page UI", () => {
   test.beforeEach(async ({ page }) => {
@@ -111,8 +111,8 @@ test.describe("Auth: Forgot Password Flow", () => {
 test.describe("Auth: Successful Login Flow", () => {
   test("Valid credentials log in and redirect to app", async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+    await page.getByLabel(/email/i).fill(TEST_EMAIL_FREE);
+    await page.getByLabel(/password/i).fill(TEST_PASSWORD_FREE);
     await page.getByRole("button", { name: /log in/i }).click();
 
     // Wait for redirect — should NOT stay on /login
@@ -126,8 +126,8 @@ test.describe("Auth: Successful Login Flow", () => {
 
   test("After login, Sign Out is in profile dropdown only per PB §5.2", async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+    await page.getByLabel(/email/i).fill(TEST_EMAIL_FREE);
+    await page.getByLabel(/password/i).fill(TEST_PASSWORD_FREE);
     await page.getByRole("button", { name: /log in/i }).click();
     await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 15000 });
 
@@ -141,8 +141,8 @@ test.describe("Auth: Successful Login Flow", () => {
 
   test("After login, Library is accessible without redirect", async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+    await page.getByLabel(/email/i).fill(TEST_EMAIL_FREE);
+    await page.getByLabel(/password/i).fill(TEST_PASSWORD_FREE);
     await page.getByRole("button", { name: /log in/i }).click();
     await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 15000 });
 

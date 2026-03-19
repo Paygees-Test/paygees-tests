@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { DISCOVER_CATEGORIES, KNOWN_BOOK, TEST_EMAIL, TEST_PASSWORD } from "./helpers";
+import { DISCOVER_CATEGORIES, KNOWN_BOOK, TEST_EMAIL_FREE, TEST_PASSWORD_FREE, TEST_EMAIL_PREMIUM, TEST_PASSWORD_PREMIUM, loginAs } from "./helpers";
 
 test.describe("Browse: Homepage Sections (PB §6.1)", () => {
   test.beforeEach(async ({ page }) => {
@@ -171,8 +171,8 @@ test.describe("Browse: Book Detail Page (PB §6.3)", () => {
 test.describe("Browse: Authenticated User Flows", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+    await page.getByLabel(/email/i).fill(TEST_EMAIL_FREE);
+    await page.getByLabel(/password/i).fill(TEST_PASSWORD_FREE);
     await page.getByRole("button", { name: /log in/i }).click();
     await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 15000 });
   });

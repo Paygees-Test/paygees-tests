@@ -9,7 +9,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { TEST_EMAIL, TEST_PASSWORD } from "./helpers";
+import { TEST_EMAIL_FREE, TEST_PASSWORD_FREE, loginAs } from "./helpers";
 
 // Visual tests run on Chromium only to avoid cross-browser rendering noise
 test.use({ browserName: "chromium" });
@@ -90,8 +90,8 @@ test.describe("Visual: Book Detail Page", () => {
 test.describe("Visual: Authenticated Pages", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+    await page.getByLabel(/email/i).fill(TEST_EMAIL_FREE);
+    await page.getByLabel(/password/i).fill(TEST_PASSWORD_FREE);
     await page.getByRole("button", { name: /log in/i }).click();
     await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 15000 });
   });

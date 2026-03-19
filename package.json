@@ -1,0 +1,26 @@
+{
+  "name": "paygees-production-tests",
+  "version": "1.0.0",
+  "description": "Production test suite for paygees-web.vercel.app",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test tests/smoke.spec.ts",
+    "test:auth": "playwright test tests/auth.spec.ts",
+    "test:browse": "playwright test tests/browse.spec.ts",
+    "test:bible": "playwright test tests/product-bible.spec.ts",
+    "test:visual": "playwright test tests/visual.spec.ts",
+    "test:api": "playwright test tests/api.spec.ts",
+    "test:accessibility": "playwright test tests/accessibility.spec.ts",
+    "test:performance": "playwright test tests/performance.spec.ts",
+    "test:security": "playwright test tests/security.spec.ts",
+    "test:seo": "playwright test tests/seo.spec.ts",
+    "test:mobile": "playwright test --project=mobile-chrome",
+    "report": "allure generate allure-results --clean -o allure-report && allure open allure-report",
+    "report:serve": "allure serve allure-results"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.0",
+    "allure-playwright": "^2.10.0",
+    "axe-playwright": "^2.0.0"
+  }
+}

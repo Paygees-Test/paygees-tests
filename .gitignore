@@ -1,0 +1,15 @@
+node_modules/
+allure-results/
+allure-report/
+playwright-report/
+test-results/
+*.png
+!tests/snapshots/**/*.png
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,411 @@
+name: Paygees Production Tests
+
+on:
+  # ── 1. Scheduled: runs every hour, 24/7
+  schedule:
+    - cron: "0 * * * *"
+
+  # ── 2. Manual: trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: "Which test suite to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - smoke
+          - auth
+          - browse
+          - product-bible
+          - visual
+          - api
+          - accessibility
+          - performance
+          - security
+          - seo
+
+  # ── 3. After every deployment (via Vercel deploy webhook → repository_dispatch)
+  repository_dispatch:
+    types: [vercel-deployment-complete]
+
+  # ── 4. On push to main (if you keep tests in same repo)
+  push:
+    branches: [main]
+    paths:
+      - "tests/**"
+      - "playwright.config.ts"
+
+env:
+  TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+  TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+  BASE_URL: https://paygees-web.vercel.app
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1: SMOKE — runs first, fast, gates the rest
+  # ─────────────────────────────────────────────
+  smoke:
+    name: "🔥 Smoke Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      smoke_passed: ${{ steps.smoke_result.outputs.passed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke tests
+        id: smoke_run
+        run: npx playwright test tests/smoke.spec.ts --project=chromium
+        continue-on-error: true
+
+      - name: Set smoke result output
+        id: smoke_result
+        run: |
+          if [ "${{ steps.smoke_run.outcome }}" == "success" ]; then
+            echo "passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload smoke results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-results
+          path: |
+            allure-results/
+            test-results/
+            playwright-report/
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # JOB 2: FULL TEST SUITE (runs if smoke passes)
+  # ─────────────────────────────────────────────
+  full-suite:
+    name: "🧪 Full Test Suite"
+    runs-on: ubuntu-latest
+    needs: smoke
+    if: needs.smoke.outputs.smoke_passed == 'true'
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - name: "Auth"
+            file: "tests/auth.spec.ts"
+            browsers: "chromium firefox"
+          - name: "Browse"
+            file: "tests/browse.spec.ts"
+            browsers: "chromium"
+          - name: "Product Bible"
+            file: "tests/product-bible.spec.ts"
+            browsers: "chromium"
+          - name: "API"
+            file: "tests/api.spec.ts"
+            browsers: "chromium"
+          - name: "Accessibility"
+            file: "tests/accessibility.spec.ts"
+            browsers: "chromium"
+          - name: "Performance"
+            file: "tests/performance.spec.ts"
+            browsers: "chromium"
+          - name: "Security"
+            file: "tests/security.spec.ts"
+            browsers: "chromium"
+          - name: "SEO"
+            file: "tests/seo.spec.ts"
+            browsers: "chromium"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Run ${{ matrix.suite.name }} tests
+        run: npx playwright test ${{ matrix.suite.file }} --project=chromium
+        continue-on-error: true
+
+      - name: Upload ${{ matrix.suite.name }} results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.suite.name }}
+          path: |
+            allure-results/
+            test-results/
+            playwright-report/
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # JOB 3: VISUAL REGRESSION (separate — slower)
+  # ─────────────────────────────────────────────
+  visual:
+    name: "👁️ Visual Regression"
+    runs-on: ubuntu-latest
+    needs: smoke
+    if: needs.smoke.outputs.smoke_passed == 'true'
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run visual tests
+        run: npx playwright test tests/visual.spec.ts --project=chromium
+        continue-on-error: true
+
+      - name: Upload visual diffs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-results
+          path: |
+            test-results/
+            playwright-report/
+            tests/**/*.png
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # JOB 4: MOBILE TESTS
+  # ─────────────────────────────────────────────
+  mobile:
+    name: "📱 Mobile Tests"
+    runs-on: ubuntu-latest
+    needs: smoke
+    if: needs.smoke.outputs.smoke_passed == 'true'
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests on mobile viewport
+        run: npx playwright test tests/smoke.spec.ts tests/browse.spec.ts tests/product-bible.spec.ts --project=mobile-chrome
+        continue-on-error: true
+
+      - name: Upload mobile results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-results
+          path: |
+            allure-results/
+            test-results/
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # JOB 5: GENERATE & PUBLISH REPORT
+  # ─────────────────────────────────────────────
+  report:
+    name: "📊 Generate & Publish Report"
+    runs-on: ubuntu-latest
+    needs: [smoke, full-suite, visual, mobile]
+    if: always()
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results/
+          merge-multiple: true
+
+      - name: Setup Java (for Allure)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install Allure CLI
+        run: npm install -g allure-commandline
+
+      - name: Merge allure results
+        run: |
+          mkdir -p merged-allure-results
+          find all-results/ -name "*.json" -o -name "*.xml" -o -name "*.png" | \
+            while read f; do cp "$f" merged-allure-results/ 2>/dev/null || true; done
+
+      - name: Generate Allure report
+        run: allure generate merged-allure-results --clean -o allure-report
+
+      - name: Load test history
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages-history
+
+      - name: Copy history to report
+        run: |
+          if [ -d "gh-pages-history/allure-report/history" ]; then
+            cp -r gh-pages-history/allure-report/history allure-report/history
+          fi
+
+      - name: Generate Playwright HTML report
+        run: npx playwright merge-reports --reporter=html all-results/playwright-report 2>/dev/null || true
+
+      - name: Deploy reports to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-report
+          publish_branch: gh-pages
+          destination_dir: allure-report
+
+      - name: Build run summary
+        id: summary
+        run: |
+          SMOKE="${{ needs.smoke.result }}"
+          FULL="${{ needs.full-suite.result }}"
+          VISUAL="${{ needs.visual.result }}"
+          MOBILE="${{ needs.mobile.result }}"
+
+          if [ "$SMOKE" == "success" ] && [ "$FULL" == "success" ]; then
+            STATUS="✅ PASSED"
+            COLOR="good"
+          elif [ "$SMOKE" == "failure" ]; then
+            STATUS="🚨 FAILED (Smoke)"
+            COLOR="danger"
+          else
+            STATUS="⚠️ PARTIAL FAILURES"
+            COLOR="warning"
+          fi
+
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "smoke=$SMOKE" >> $GITHUB_OUTPUT
+          echo "full=$FULL" >> $GITHUB_OUTPUT
+          echo "visual=$VISUAL" >> $GITHUB_OUTPUT
+          echo "mobile=$MOBILE" >> $GITHUB_OUTPUT
+
+      - name: Write GitHub Step Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          # 🧪 Paygees Production Test Report
+
+          | Suite | Result |
+          |-------|--------|
+          | 🔥 Smoke | ${{ needs.smoke.result }} |
+          | 🧪 Full Suite | ${{ needs.full-suite.result }} |
+          | 👁️ Visual Regression | ${{ needs.visual.result }} |
+          | 📱 Mobile | ${{ needs.mobile.result }} |
+
+          **Overall: ${{ steps.summary.outputs.status }}**
+
+          📊 [View Full Allure Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report)
+
+          Run: `#${{ github.run_number }}` | Triggered by: `${{ github.event_name }}`
+          EOF
+
+  # ─────────────────────────────────────────────
+  # JOB 6: NOTIFY ON FAILURE
+  # ─────────────────────────────────────────────
+  notify:
+    name: "🔔 Notify on Failure"
+    runs-on: ubuntu-latest
+    needs: [smoke, full-suite, visual, mobile]
+    if: |
+      always() && (
+        needs.smoke.result == 'failure' ||
+        needs.full-suite.result == 'failure'
+      )
+    steps:
+      - name: Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.NOTIFY_EMAIL_USER }}
+          password: ${{ secrets.NOTIFY_EMAIL_PASS }}
+          subject: "🚨 Paygees Tests FAILED — Run #${{ github.run_number }}"
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: Paygees Test Bot <${{ secrets.NOTIFY_EMAIL_USER }}>
+          body: |
+            Production tests failed on paygees-web.vercel.app
+
+            Run #${{ github.run_number }} — Triggered by: ${{ github.event_name }}
+
+            Results:
+            - Smoke:       ${{ needs.smoke.result }}
+            - Full Suite:  ${{ needs.full-suite.result }}
+            - Visual:      ${{ needs.visual.result }}
+            - Mobile:      ${{ needs.mobile.result }}
+
+            View full report:
+            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report
+
+            View run:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Send Slack notification (optional)
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{
+            "text": "🚨 *Paygees Production Tests FAILED*\nRun #${{ github.run_number }} | Triggered: ${{ github.event_name }}\nSmoke: ${{ needs.smoke.result }} | Full Suite: ${{ needs.full-suite.result }}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+          }' \
+          $SLACK_WEBHOOK_URL

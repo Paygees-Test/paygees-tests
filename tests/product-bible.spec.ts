@@ -246,15 +246,23 @@ test.describe("PB: Editor's Picks Naming Canonical Rule (PB §6.1)", () => {
 // FORUMS — ACCESS RULES
 // ─────────────────────────────────────────────
 test.describe("PB: Forum Access Rules (PB §6.6, Q14)", () => {
-  test("Forums page is accessible without login (read access for Free tier)", async ({ page }) => {
+  test("Forums require login — unauthenticated visitors redirected (login is CTA per PB Q14)", async ({ page }) => {
+    // PB Q14: Free tier gets forum read + reply access, BUT users must be logged in.
+    // Forums are NOT publicly accessible to anonymous visitors.
+    // Login is the conversion CTA for unauthenticated users hitting the forums.
     await page.goto("/forums");
-    // Free tier gets read + reply per Q14 — forum should not fully gate behind login
+    await page.waitForLoadState("networkidle");
     const url = page.url();
-    // It's acceptable to require login, but if accessible, should show content
-    if (!url.includes("/login")) {
-      const pageText = await page.textContent("body");
-      expect(pageText).not.toContain("500");
-    }
+    // Must redirect to login — anonymous access is intentionally blocked
+    expect(url).toMatch(/\/login|\/register/);
+  });
+
+  test("Forums page does not return a 500 error", async ({ page }) => {
+    await page.goto("/forums");
+    await page.waitForLoadState("networkidle");
+    const pageText = await page.textContent("body");
+    expect(pageText).not.toContain("500");
+    expect(pageText).not.toContain("Internal Server Error");
   });
 });
 

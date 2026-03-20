@@ -38,8 +38,27 @@ on:
       - "playwright.config.ts"
 
 env:
+  # Main account
   TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
   TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+  # Free tier
+  TEST_EMAIL_FREE: ${{ secrets.TEST_EMAIL_FREE }}
+  TEST_PASSWORD_FREE: ${{ secrets.TEST_PASSWORD_FREE }}
+  # Basic tier
+  TEST_EMAIL_BASIC: ${{ secrets.TEST_EMAIL_BASIC }}
+  TEST_PASSWORD_BASIC: ${{ secrets.TEST_PASSWORD_BASIC }}
+  # Premium tier
+  TEST_EMAIL_PREMIUM: ${{ secrets.TEST_EMAIL_PREMIUM }}
+  TEST_PASSWORD_PREMIUM: ${{ secrets.TEST_PASSWORD_PREMIUM }}
+  # Publisher account
+  TEST_EMAIL_PUBLISHER: ${{ secrets.TEST_EMAIL_PUBLISHER }}
+  TEST_PASSWORD_PUBLISHER: ${{ secrets.TEST_PASSWORD_PUBLISHER }}
+  # Guardian account
+  TEST_EMAIL_GUARDIAN: ${{ secrets.TEST_EMAIL_GUARDIAN }}
+  TEST_PASSWORD_GUARDIAN: ${{ secrets.TEST_PASSWORD_GUARDIAN }}
+  # Child/Junior account
+  TEST_EMAIL_CHILD: ${{ secrets.TEST_EMAIL_CHILD }}
+  TEST_PASSWORD_CHILD: ${{ secrets.TEST_PASSWORD_CHILD }}
   BASE_URL: https://paygees-web.vercel.app
 
 jobs:

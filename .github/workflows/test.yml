@@ -119,7 +119,7 @@ jobs:
     name: "🧪 Full Test Suite"
     runs-on: ubuntu-latest
     needs: smoke
-    if: needs.smoke.outputs.smoke_passed == 'true'
+    if: always() && needs.smoke.result != 'cancelled'
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -188,7 +188,7 @@ jobs:
     name: "👁️ Visual Regression"
     runs-on: ubuntu-latest
     needs: smoke
-    if: needs.smoke.outputs.smoke_passed == 'true'
+    if: always() && needs.smoke.result != 'cancelled'
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -228,7 +228,7 @@ jobs:
     name: "📱 Mobile Tests"
     runs-on: ubuntu-latest
     needs: smoke
-    if: needs.smoke.outputs.smoke_passed == 'true'
+    if: always() && needs.smoke.result != 'cancelled'
     timeout-minutes: 30
     steps:
       - name: Checkout

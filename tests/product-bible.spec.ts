@@ -1,9 +1,8 @@
 /**
  * PRODUCT BIBLE COMPLIANCE TESTS
- * These tests verify the live site matches the Product Bible v4.5 specification.
- * Unlike build tests (does it work?), these tests ask: does it match what it's supposed to be?
- *
- * PB References throughout — every test cites the section it validates.
+ * Verifies the live site matches Product Bible v4.6 (March 19, 2026).
+ * These tests ask: does the product match what it's supposed to be?
+ * Every test cites the PB section it validates.
  */
 
 import { test, expect } from "@playwright/test";
@@ -11,8 +10,9 @@ import {
   TAGLINE,
   SIDEBAR_NAV,
   BRAND,
-  TEST_EMAIL,
-  TEST_PASSWORD,
+  TEST_EMAIL_FREE,
+  TEST_PASSWORD_FREE,
+  loginAs,
   KNOWN_BOOK,
 } from "./helpers";
 
@@ -40,10 +40,9 @@ test.describe("PB: Brand Identity (§10.1, §10.2)", () => {
     await expect(logo).toBeVisible();
   });
 
-  test("Primary colour #1EAEDB is used (not banned #2CB5B5) (PB §10.2)", async ({ page }) => {
+  test("Primary colour #1EAEDB is used — banned #2CB5B5 must not appear (PB §10.2)", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    // Check for the banned colour in CSS
     const bannedColour = await page.evaluate(() => {
       const allElements = document.querySelectorAll("*");
       for (const el of allElements) {
@@ -55,15 +54,12 @@ test.describe("PB: Brand Identity (§10.1, §10.2)", () => {
       }
       return false;
     });
-    expect(bannedColour, "Banned colour #2CB5B5 must not appear on the site").toBe(false);
+    expect(bannedColour, "Banned colour #2CB5B5 must not appear anywhere").toBe(false);
   });
 
-  test("'Creator' term does not appear in UI (banned per PB Q16)", async ({ page }) => {
+  test("'Creator' term does not appear in UI — banned platform-wide per PB Q16", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    const pageText = await page.textContent("body");
-    // "Creator" is explicitly banned platform-wide per Q16
-    // Only exception: third-party references or footer copyright text
     const mainContent = await page.locator("main, #main, [role='main']").textContent().catch(() => "");
     expect(mainContent?.toLowerCase()).not.toContain("creator profile");
   });
@@ -86,8 +82,7 @@ test.describe("PB: Web Navigation Structure (PB §5.2)", () => {
   });
 
   test("Discover section includes: Books, Audiobooks, Periodicals, Comics, Documents", async ({ page }) => {
-    const expectedLinks = ["Books", "Audiobooks", "Periodicals"];
-    for (const link of expectedLinks) {
+    for (const link of ["Books", "Audiobooks", "Periodicals"]) {
       const navLink = page.getByRole("link", { name: new RegExp(link, "i") });
       await expect(navLink.first(), `Discover link '${link}' should be visible`).toBeVisible();
     }
@@ -107,10 +102,8 @@ test.describe("PB: Web Navigation Structure (PB §5.2)", () => {
   });
 
   test("Footer shows payment method logos (PB §5.2)", async ({ page }) => {
-    // Payment logos: VISA, MC, AMEX
     const footer = page.locator("footer");
     const footerText = await footer.textContent();
-    // At least one payment method should be mentioned or have an image
     const footerImages = footer.locator("img");
     const hasPaymentText = footerText?.toLowerCase().match(/visa|mastercard|mc|amex|paystack|verve/);
     const imageCount = await footerImages.count();
@@ -132,20 +125,18 @@ test.describe("PB: Home Screen Sections (PB §6.1)", () => {
     expect(pageText?.toLowerCase()).toMatch(/bestseller/);
   });
 
-  test("Section 'See More' links are present (max 10 per section per PB §6.1)", async ({ page }) => {
+  test("Section 'See More' links are present — max 10 per section (PB §6.1)", async ({ page }) => {
     const seeMoreLinks = page.getByRole("link", { name: /see more|view all/i });
     const count = await seeMoreLinks.count();
     expect(count, "At least one 'See More' link should be present").toBeGreaterThan(0);
   });
 
-  test("Section headers use coral/orange colour per PB §10.4 (not button-fill coral)", async ({ page }) => {
-    // PB: Section headers use #E8735A — it is for headers only, NOT CTA button fills
+  test("Coral #E8735A used for section headers only — not CTA button fills (PB §10.2)", async ({ page }) => {
     const buttons = page.getByRole("button");
     const count = await buttons.count();
     for (let i = 0; i < Math.min(count, 10); i++) {
       const btn = buttons.nth(i);
       const bgColor = await btn.evaluate((el) => window.getComputedStyle(el).backgroundColor);
-      // Coral RGB = rgb(232, 115, 90) — must not be button fill
       expect(bgColor, "Coral #E8735A must not be used as CTA button background").not.toContain("232, 115, 90");
     }
   });
@@ -188,7 +179,7 @@ test.describe("PB: Book Detail Page Spec (PB §6.3)", () => {
     expect(pageText?.toLowerCase()).toContain("free");
   });
 
-  test("File format names do NOT appear (PB §6.3 'Never show file format')", async ({ page }) => {
+  test("File format names do NOT appear — never show EPUB/PDF/MP3 (PB §6.3)", async ({ page }) => {
     const pageText = await page.textContent("body");
     expect(pageText?.toLowerCase()).not.toContain("epub");
     expect(pageText?.toLowerCase()).not.toMatch(/\.pdf\b/);
@@ -196,32 +187,83 @@ test.describe("PB: Book Detail Page Spec (PB §6.3)", () => {
 });
 
 // ─────────────────────────────────────────────
-// SUBSCRIPTION TIERS
+// SUBSCRIPTION TIERS (PB §1.3 — v4.6)
 // ─────────────────────────────────────────────
-test.describe("PB: Subscription Tiers in UI (PB §1.3)", () => {
-  test("Subscription/pricing page (if exists) shows all 5 tiers", async ({ page }) => {
-    // Try common pricing page routes
+test.describe("PB: Subscription Tiers in UI (PB §1.3, v4.6)", () => {
+  test("Pricing page (if exists) shows the 4 main tiers: Free, Basic, Standard, Premium", async ({ page }) => {
+    // Per PB v4.6: Junior is a paid add-on, not a peer tier.
+    // The main tier ladder is Free / Basic / Standard / Premium only.
     for (const path of ["/pricing", "/subscribe", "/plans"]) {
       const response = await page.goto(path);
       if (response?.status() === 200) {
         const pageText = await page.textContent("body");
-        // Should show tier names
-        expect(pageText?.toLowerCase()).toMatch(/free|basic|standard|premium/);
-        return; // Test passes on first found
+        expect(pageText?.toLowerCase()).toMatch(/free/);
+        expect(pageText?.toLowerCase()).toMatch(/basic/);
+        expect(pageText?.toLowerCase()).toMatch(/standard/);
+        expect(pageText?.toLowerCase()).toMatch(/premium/);
+        return;
       }
     }
-    // If no pricing page exists yet, that's acceptable at current build stage
     test.skip();
   });
 
-  test("'Junior' tier terminology used (not 'Kids' or 'Children') per PB §1.3", async ({ page }) => {
+  test("'Junior' terminology used — not 'Kids' or 'Children' (PB §1.3)", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
     const pageText = await page.textContent("body");
-    // If tier labels appear, must use correct names per PB
     if (pageText?.toLowerCase().includes("tier") || pageText?.toLowerCase().includes("plan")) {
       expect(pageText?.toLowerCase()).not.toContain("kids tier");
       expect(pageText?.toLowerCase()).not.toContain("children tier");
+    }
+  });
+
+  test("Junior is NOT presented as a default-included benefit of any tier (PB §1.3, Q21)", async ({ page }) => {
+    // Per PB v4.6 Q21: Junior is a paid add-on for ALL tiers — never bundled by default.
+    // Standard and Premium subscribers do NOT get Junior free unless a campaign waiver applies.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const pageText = await page.textContent("body");
+    expect(pageText?.toLowerCase()).not.toContain("includes junior");
+    expect(pageText?.toLowerCase()).not.toContain("child accounts included");
+    expect(pageText?.toLowerCase()).not.toContain("free child accounts");
+    expect(pageText?.toLowerCase()).not.toContain("junior included");
+  });
+});
+
+// ─────────────────────────────────────────────
+// JUNIOR ADD-ON MODEL (PB §1.3, §2.3, Q21 — v4.6)
+// ─────────────────────────────────────────────
+test.describe("PB: Junior Add-On Model (PB §1.3, §2.3, Q21 — v4.6)", () => {
+  test("Junior is not presented as a comparable standalone subscription tier", async ({ page }) => {
+    // Per PB v4.6 Q21: Junior is a separate paid add-on at 1,000/mo.
+    // It is not a step on the Free > Basic > Standard > Premium upgrade ladder.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const pageText = await page.textContent("body");
+    if (pageText?.toLowerCase().includes("junior")) {
+      // Should not appear as an upgrade option alongside the main tiers
+      expect(pageText?.toLowerCase()).not.toContain("upgrade to junior");
+    }
+  });
+
+  test("Guardian Dashboard is not linked to logged-out users (PB §5.3)", async ({ page }) => {
+    // Guardian Dashboard is an authenticated feature — not publicly accessible
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const guardianLink = page.getByRole("link", { name: /guardian dashboard/i });
+    await expect(guardianLink).not.toBeVisible();
+  });
+
+  test("Junior add-on available to Free tier — not exclusive to paid tiers (PB §1.3, Q21)", async ({ page }) => {
+    // Per PB v4.6 Q21: ANY account tier (Free, Basic, Standard, Premium) can subscribe to Junior.
+    // No tier gate on the add-on itself — only the campaign waiver has tier eligibility rules.
+    // This test documents the requirement — verified when Guardian Dashboard is built
+    await page.goto("/");
+    const pageText = await page.textContent("body");
+    // If any pricing copy references Junior, it must not restrict it to paid tiers only
+    if (pageText?.toLowerCase().includes("junior add-on")) {
+      expect(pageText?.toLowerCase()).not.toContain("junior add-on for premium only");
+      expect(pageText?.toLowerCase()).not.toContain("junior add-on for standard only");
     }
   });
 });
@@ -234,7 +276,6 @@ test.describe("PB: Editor's Picks Naming Canonical Rule (PB §6.1)", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
     const pageText = await page.textContent("body");
-    // If the curated picks section is built, it must use the canonical name
     if (pageText?.toLowerCase().includes("picks")) {
       expect(pageText?.toLowerCase()).not.toContain("staff picks");
       expect(pageText?.toLowerCase()).not.toContain("paygees picks");
@@ -247,14 +288,9 @@ test.describe("PB: Editor's Picks Naming Canonical Rule (PB §6.1)", () => {
 // ─────────────────────────────────────────────
 test.describe("PB: Forum Access Rules (PB §6.6, Q14)", () => {
   test("Forums require login — unauthenticated visitors redirected (login is CTA per PB Q14)", async ({ page }) => {
-    // PB Q14: Free tier gets forum read + reply access, BUT users must be logged in.
-    // Forums are NOT publicly accessible to anonymous visitors.
-    // Login is the conversion CTA for unauthenticated users hitting the forums.
     await page.goto("/forums");
     await page.waitForLoadState("networkidle");
-    const url = page.url();
-    // Must redirect to login — anonymous access is intentionally blocked
-    expect(url).toMatch(/\/login|\/register/);
+    expect(page.url()).toMatch(/\/login|\/register/);
   });
 
   test("Forums page does not return a 500 error", async ({ page }) => {
@@ -264,14 +300,22 @@ test.describe("PB: Forum Access Rules (PB §6.6, Q14)", () => {
     expect(pageText).not.toContain("500");
     expect(pageText).not.toContain("Internal Server Error");
   });
+
+  test("Logged-in Free user can access forums (PB Q14 — read + reply access)", async ({ page }) => {
+    await loginAs(page, TEST_EMAIL_FREE, TEST_PASSWORD_FREE);
+    await page.goto("/forums");
+    await page.waitForLoadState("networkidle");
+    expect(page.url()).not.toMatch(/\/login/);
+    const pageText = await page.textContent("body");
+    expect(pageText).not.toContain("500");
+  });
 });
 
 // ─────────────────────────────────────────────
-// AUTHOR PROFILE
+// AUTHOR PROFILE RULES
 // ─────────────────────────────────────────────
 test.describe("PB: Author Profile Rules (PB §6.10, Q15, Q16)", () => {
   test("Author profile pages use /author/ route (PB §6.10)", async ({ page }) => {
-    // Navigate to a known book and check if author link uses /author/ path
     await page.goto(KNOWN_BOOK.path);
     await page.waitForLoadState("networkidle");
     const authorLinks = page.locator("a[href*='/author/']");
@@ -281,9 +325,8 @@ test.describe("PB: Author Profile Rules (PB §6.10, Q15, Q16)", () => {
     }
   });
 
-  test("No 'Publisher Profile' page exists (Publisher is internal-only per PB Q16)", async ({ page }) => {
+  test("No 'Publisher Profile' page — Publisher is internal-only (PB Q16)", async ({ page }) => {
     const response = await page.goto("/publisher");
-    // Publisher has no public profile per PB — this route should 404 or redirect
     if (response?.status() === 200) {
       const pageText = await page.textContent("body");
       expect(pageText?.toLowerCase()).not.toContain("publisher profile");
@@ -298,15 +341,13 @@ test.describe("PB: Information Architecture (PB §5.3)", () => {
   test("Logged-out users see marketing/landing content on homepage", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    // Should not immediately show authenticated-only content without login
     const pageText = await page.textContent("body");
     expect(pageText).toMatch(/discover|sign up|log in|explore|read/i);
   });
 
-  test("Admin routes are not linked from the main site (PB §5.3)", async ({ page }) => {
+  test("Admin routes not linked from main site (PB §5.3, §11.6)", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    // No admin link should be in the public nav
     const allLinks = await page.locator("a").all();
     for (const link of allLinks) {
       const href = await link.getAttribute("href");
@@ -316,12 +357,18 @@ test.describe("PB: Information Architecture (PB §5.3)", () => {
     }
   });
 
-  test("Publisher Dashboard is not linked from public homepage (PB §5.3)", async ({ page }) => {
+  test("Publisher Dashboard not linked from public homepage (PB §5.3)", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    const pageText = await page.textContent("body");
-    // Publisher features should be hidden inside user profile — not on homepage
     const publisherDashLink = page.getByRole("link", { name: /publisher dashboard/i });
     await expect(publisherDashLink).not.toBeVisible();
+  });
+
+  test("Sign Out is in profile dropdown only — not in top bar directly (PB §5.2)", async ({ page }) => {
+    await loginAs(page, TEST_EMAIL_FREE, TEST_PASSWORD_FREE);
+    const topBarSignOut = page.locator("header").getByRole("button", { name: /sign out/i });
+    const topBarSignOutLink = page.locator("nav").getByRole("link", { name: /sign out/i });
+    await expect(topBarSignOut).not.toBeVisible();
+    await expect(topBarSignOutLink).not.toBeVisible();
   });
 });
